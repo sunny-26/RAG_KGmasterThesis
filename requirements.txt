@@ -1,0 +1,4 @@
+llama-index==0.9.46
+llama-cpp-python==0.2.38
+llamaindex-py-client==0.1.13
+langchain-core==0.1.18
