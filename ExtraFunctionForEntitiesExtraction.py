@@ -2,8 +2,10 @@
 
 from llama_cpp import Llama,LlamaGrammar
 from ExtraFunction import read_file_to_string
-
-
+from langchain.chains import create_tagging_chain
+from llamaapi import LlamaAPI
+from langchain_experimental.llms import ChatLlamaAPI
+from langchain_openai import OpenAI
 def extract_json(model_path,grammar_path,question,n_gpu_layers=64,n_ctx=4096,max_tokens=2096):
     #initialize
 
@@ -155,4 +157,166 @@ def put_data_into_query_template(json_pair):
     sparql_query = query_template.format(variable=variable, value=value)
     """
     return sparql_query
+
+
+def Call_LLM_via_API(question):
+    #initialize prompt
+    # send a request to LLM to construct query
+    context = """
+    PREFIX dct: <http://purl.org/dc/terms/>
+    SELECT ?publication ?title ?available ?abstract ?accessRights ?accrualMethod ?accrualPeriodicity ?accrualPolicy ?alternative ?audience ?bibliographicCitation ?conformsTo ?contributor ?coverage ?created ?creator ?date ?dateAccepted ?dateCopyrighted ?dateSubmitted ?description ?educationLevel ?extent ?format ?hasFormat ?hasPart ?hasVersion ?identifier ?instructionalMethod ?isFormatOf ?isPartOf ?isReferencedBy ?isReplacedBy ?isRequiredBy ?issued ?isVersionOf ?language ?license ?mediator ?medium ?modified ?provenance ?publisher ?references ?relation ?replaces ?requires ?rights ?rightsHolder ?source ?spatial ?subject ?tableOfContents ?temporal ?type ?valid
+
+    WHERE {
+      ?publication dct:title ?title ;
+                   dct:available ?available .
+
+      OPTIONAL { ?publication dct:abstract ?abstract }
+      OPTIONAL { ?publication dct:accessRights ?accessRights }
+      OPTIONAL { ?publication dct:accrualMethod ?accrualMethod }
+      ...
+
+      FILTER (REGEX(?variable, "value"))
+    }
+
+
+    """
+    jsonFormat = """
+    Answer: {
+      "variable": "<variable_name>",
+      "value": "<search_keyword>"
+    }
+    if there are several values:
+      Answer: {
+      "variable": "<variable_name>",
+      "value": "<search_keyword>"
+    }
+    {
+      "variable": "<variable_name>",
+      "value": "<search_keyword>"
+    }
+
+    """
+    examples = """Take the examples of output into account: Example 1: Question: Tell me who is a publisher of the publication with the abstract 'This is about nature'
+                Output:{
+      "variable": "abstract",
+      "value": "This is about nature"
+    }
+
+    Example 2:
+    Question: 'tell me the title of the most recent publication, created by John Doe'
+    Output:
+    {
+      "variable": "creator",
+      "value": "John Doe"
+    }
+    Example 3:
+    Question: 'tell me when the book Web Engineering was published'
+    Output:
+    {
+      "variable": "title",
+      "value": "Web Engineering"
+    }
+    Example 4:
+    Question: 'List all the names of all authors who contributed to the book written by James Wang'
+    Output:
+    {
+      "variable": "creator",
+      "value": "James Wang"
+    }
+    Example 5:
+    Question: 'what the main focus of 'Evolution of Web Science' '
+    Output:
+    {
+      "variable": "creator",
+      "value": "James Wang"
+    }
+
+    """
+
+    prompt_For_Query = "Your are SPARQL-query expert. Based on the provided context find the variable and value in the question." + "Question:" + question + "SPARQL-template:" + context + "Note: output the results in JSON format:" + jsonFormat + "Note: variable can only contain properties from DCMI Metadata Terms." + examples
+    generate_schema = {
+        "type": "object",
+        "properties": {
+            "variable": {
+                "type": "string",
+                "enum": [
+                    "publication",
+                    "title",
+                    "available",
+                    "abstract",
+                    "accessRights",
+                    "accrualMethod",
+                    "accrualPeriodicity",
+                    "accrualPolicy",
+                    "alternative",
+                    "audience",
+                    "bibliographicCitation",
+                    "conformsTo",
+                    "contributor",
+                    "coverage",
+                    "created",
+                    "creator",
+                    "date",
+                    "dateAccepted",
+                    "dateCopyrighted",
+                    "dateSubmitted",
+                    "description",
+                    "educationLevel",
+                    "extent",
+                    "format",
+                    "hasFormat",
+                    "hasPart",
+                    "hasVersion",
+                    "identifier",
+                    "instructionalMethod",
+                    "isFormatOf",
+                    "isPartOf",
+                    "isReferencedBy",
+                    "isReplacedBy",
+                    "isRequiredBy",
+                    "issued",
+                    "isVersionOf",
+                    "language",
+                    "license",
+                    "mediator",
+                    "medium",
+                    "modified",
+                    "provenance",
+                    "publisher",
+                    "references",
+                    "relation",
+                    "replaces",
+                    "requires",
+                    "rights",
+                    "rightsHolder",
+                    "source",
+                    "spatial",
+                    "subject",
+                    "tableOfContents",
+                    "temporal",
+                    "type",
+                    "valid"
+                ],
+                "description": "Property extracted from the sentence"
+            },
+            "value": {
+                "type": "string",
+                "description": "Value correlated to the variable"
+            }
+        },
+        "required": ["variable", "value"]
+    }
+
+
+
+    #call api
+
+    api_key = "LL-4nklQdzbKARmXLBB8sQg5RM8jtw3lfms7sSe7OnwOHztA2FmtBwwgE0Q274FzeGy"
+    llama = LlamaAPI(api_key)
+    model = ChatLlamaAPI(client=llama)
+
+    chain = create_tagging_chain(generate_schema, model)
+    response=chain.run(prompt_For_Query)
+    return response
+
 
