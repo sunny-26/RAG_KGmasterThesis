@@ -430,3 +430,7 @@ def AccessModelAPILammaCpp(model_name,api_key,prompt,grammar_path):
   )
 
   return response.choices[0].message.content
+
+from pyngrok import ngrok
+
+ngrok.set_auth_token("2dgv56PEcfwstTxsS0JtABJAtqC_6ejSVrbCmgdhS71MDzqhW")

@@ -6,6 +6,34 @@ from langchain.chains import create_tagging_chain
 from llamaapi import LlamaAPI
 from langchain_experimental.llms import ChatLlamaAPI
 from langchain_openai import OpenAI
+
+#query template for put_data_into_query_template function
+query_full_template="""
+PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX dce: <http://purl.org/dc/elements/1.1/>
+PREFIX bibo: <http://purl.org/ontology/bibo/>
+PREFIX tucbib: <https://tucbib.tu-chemnitz.de/schema/>
+
+SELECT DISTINCT ?publication (GROUP_CONCAT(DISTINCT ?creator; SEPARATOR=";") as ?authors) (GROUP_CONCAT(DISTINCT ?title; SEPARATOR="<!|!>") as ?titles) ?issn  ?available ?issued ?abstract ?type ?publisher
+(GROUP_CONCAT(DISTINCT ?subject ; SEPARATOR=";") as ?keywords)
+?description ?language
+WHERE {
+  ?publication dct:title ?title.
+OPTIONAL{?publication tucbib:orderedAuthor ?creator.}
+ OPTIONAL { ?publication dct:abstract ?abstract }
+  OPTIONAL {?publication bibo:doi ?doi.}
+  
+  OPTIONAL {?publication dce:subject ?subject.}
+  OPTIONAL {?publication dce:issn ?issn.}
+OPTIONAL {  ?publication dct:issued ?issued.}
+OPTIONAL {?publication tucbib:orderedAuthor ?creator.}
+OPTIONAL { ?publication dct:publisher ?publisher.}
+OPTIONAL {?publication dct:type ?type.}
+OPTIONAL {?publication dct:available ?available .}
+OPTIONAL { ?publication dct:description ?description }
+OPTIONAL { ?publication dct:language ?language }
+"""
+
 def extract_json(model_path,grammar_path,question,n_gpu_layers=64,n_ctx=4096,max_tokens=2096):
     #initialize
 
@@ -297,11 +325,11 @@ def Call_LLM_via_API(question):
                     "type",
                     "valid"
                 ],
-                "description": "Property extracted from the sentence"
+                "description": " Relevant variable from the DCMI Metadata Terms (DCMI Metaterms) properties list within user queries."
             },
             "value": {
                 "type": "string",
-                "description": "Value correlated to the variable"
+                "description": "Value correlated to the variable without any extra quotes."
             }
         },
         "required": ["variable", "value"]

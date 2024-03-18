@@ -25,24 +25,34 @@ app = Flask(__name__)
 def chat_with_llm_apiVersion(question):
 
     # Step 1: Retrieve variable and its value
-
+    success=False # value to ensure successfull retrival of data fromKG
+    counter=0
     extraInstruction = "If you do not know, say, that you do not know."
-    parameters_for_query = json.dumps(Call_LLM_via_API(question))
-    print(parameters_for_query)
+    while success is False and counter < 6:
+
+        parameters_for_query = json.dumps(Call_LLM_via_API(question))
+        print(parameters_for_query)
 
     # Step 2: send request to Knowledge graph
 
     # 2. Create query using template
-    sparql_query = put_data_into_query_template(json.loads(parameters_for_query))
+        sparql_query = put_data_into_query_template(json.loads(parameters_for_query))
 
-    # 3. Sneding request
-    sparql_endpoint = "https://triplestore1.informatik.tu-chemnitz.de/sparql/"
-    result = get_from_kg(sparql_query, sparql_endpoint)
+    # 3. Sending request
+        sparql_endpoint = "https://triplestore1.informatik.tu-chemnitz.de/sparql/"
+        result = get_from_kg(sparql_query, sparql_endpoint)
+
 
 
     # Step 3: creating sub graph
-    node_FromGraph_tups = []
-    create_sub_graph(node_FromGraph_tups, result)
+        node_FromGraph_tups = []
+        create_sub_graph(node_FromGraph_tups, result)
+        if node_FromGraph_tups:
+            success = True
+        else:counter += 1
+    if counter > 5:
+        response = "It seems like I do not possess this knowledge"
+        return
 
     # Step 4: RAG implementation
 
@@ -75,8 +85,22 @@ def chat_with_llm_apiVersion(question):
         include_text=False, response_mode="tree_summarize"
     )
 
+    key_words = """
+          "publication",
+                        "title",
+                        "available",
+                        "abstract",
+                        "bibliographicCitation",
+                        "contributor",
+                        "coverage",
+                        "created",
+                        "creator",
+                        "date",
+                        "description"
+
+        """
     response = query_engine.query(
-        question + extraInstruction,
+        question + extraInstruction + "Helpful keywords:" + key_words,
 
     )
     return str(response)
@@ -176,17 +200,17 @@ def ask():
 
 
 
-question = "tell me about publication Human-Factors Taxonomy. "
+question = "who are the authors of the publication Exploring Crowdsourced Reverse Engineering. "
 #print(Call_LLM_via_API(question))
 #chat_with_llm(question)
-#chat_with_llm_apiVersion(question)
+chat_with_llm_apiVersion(question)
 
-from pyngrok import ngrok
-ngrok.set_auth_token("2dgv56PEcfwstTxsS0JtABJAtqC_6ejSVrbCmgdhS71MDzqhW")
 
+
+"""
 if __name__ == '__main__':
     app.run(debug=True)
 
-
+"""
 
 
