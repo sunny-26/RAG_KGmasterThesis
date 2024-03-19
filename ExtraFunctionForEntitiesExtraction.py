@@ -1,14 +1,14 @@
-#ExtraFunctionForEntitiesExtraction
+# ExtraFunctionForEntitiesExtraction
 
-from llama_cpp import Llama,LlamaGrammar
+from llama_cpp import Llama, LlamaGrammar
 from ExtraFunction import read_file_to_string
 from langchain.chains import create_tagging_chain
 from llamaapi import LlamaAPI
 from langchain_experimental.llms import ChatLlamaAPI
 from langchain_openai import OpenAI
-
-#query template for put_data_into_query_template function
-query_full_template="""
+from openai import OpenAI as openai
+# query template for put_data_into_query_template function
+query_full_template = """
 PREFIX dct: <http://purl.org/dc/terms/>
 PREFIX dce: <http://purl.org/dc/elements/1.1/>
 PREFIX bibo: <http://purl.org/ontology/bibo/>
@@ -22,7 +22,7 @@ WHERE {
 OPTIONAL{?publication tucbib:orderedAuthor ?creator.}
  OPTIONAL { ?publication dct:abstract ?abstract }
   OPTIONAL {?publication bibo:doi ?doi.}
-  
+
   OPTIONAL {?publication dce:subject ?subject.}
   OPTIONAL {?publication dce:issn ?issn.}
 OPTIONAL {  ?publication dct:issued ?issued.}
@@ -34,8 +34,9 @@ OPTIONAL { ?publication dct:description ?description }
 OPTIONAL { ?publication dct:language ?language }
 """
 
-def extract_json(model_path,grammar_path,question,n_gpu_layers=64,n_ctx=4096,max_tokens=2096):
-    #initialize
+
+def extract_json(model_path, grammar_path, question, n_gpu_layers=64, n_ctx=4096, max_tokens=2096):
+    # initialize
 
     llama2_model = Llama(
         model_path=model_path,
@@ -84,7 +85,7 @@ def extract_json(model_path,grammar_path,question,n_gpu_layers=64,n_ctx=4096,max
             "Your are SPARQL-query expert. Based on the provided context find the variable and value in the question." +
             "Question: " + question + "SPARQL-template: " + context +
             "Note: output the results in JSON format:" + json_format +
-            "Note: variable can only contain properties from DCMI Metadata Terms."+
+            "Note: variable can only contain properties from DCMI Metadata Terms." +
             """Take the examples of output into account: Example 1: {
   "variable": "abstract",
   "value": "keyword"
@@ -101,7 +102,7 @@ Example 2:
 
     )
 
-    #calling LLM
+    # calling LLM
     response = llama2_model(prompt=prompt_for_query, grammar=grammar, max_tokens=max_tokens)
 
     return response['choices'][0]['text']
@@ -188,23 +189,27 @@ def put_data_into_query_template(json_pair):
 
 
 def Call_LLM_via_API(question):
-    #initialize prompt
+    # initialize prompt
     # send a request to LLM to construct query
     context = """
-    PREFIX dct: <http://purl.org/dc/terms/>
-    SELECT ?publication ?title ?available ?abstract ?accessRights ?accrualMethod ?accrualPeriodicity ?accrualPolicy ?alternative ?audience ?bibliographicCitation ?conformsTo ?contributor ?coverage ?created ?creator ?date ?dateAccepted ?dateCopyrighted ?dateSubmitted ?description ?educationLevel ?extent ?format ?hasFormat ?hasPart ?hasVersion ?identifier ?instructionalMethod ?isFormatOf ?isPartOf ?isReferencedBy ?isReplacedBy ?isRequiredBy ?issued ?isVersionOf ?language ?license ?mediator ?medium ?modified ?provenance ?publisher ?references ?relation ?replaces ?requires ?rights ?rightsHolder ?source ?spatial ?subject ?tableOfContents ?temporal ?type ?valid
+      PREFIX dct: <http://purl.org/dc/terms/>
+PREFIX dce: <http://purl.org/dc/elements/1.1/>
+PREFIX bibo: <http://purl.org/ontology/bibo/>
+PREFIX tucbib: <https://tucbib.tu-chemnitz.de/schema/>
 
-    WHERE {
-      ?publication dct:title ?title ;
-                   dct:available ?available .
+SELECT DISTINCT ?publication ?creator ?title ?issn  ?available ?issued ?abstract ?type ?publisher ?subject ?description ?language, ?bibliographicCitation
+WHERE {
+  ?publication dct:title ?title.
+OPTIONAL{?publication tucbib:orderedAuthor ?creator.}
+ OPTIONAL { ?publication dct:abstract ?abstract }
+  OPTIONAL {?publication bibo:doi ?doi.}
+  OPTIONAL {?publication dct:bibliographicCitation ?bibliographicCitation.}
+  OPTIONAL {?publication dce:subject ?subject.}
+  OPTIONAL {?publication dce:issn ?issn.}
+OPTIONAL {  ?publication dct:issued ?issued.}
+OPTIONAL {?publication tucbib:orderedAuthor ?creator.}
+...
 
-      OPTIONAL { ?publication dct:abstract ?abstract }
-      OPTIONAL { ?publication dct:accessRights ?accessRights }
-      OPTIONAL { ?publication dct:accrualMethod ?accrualMethod }
-      ...
-
-      FILTER (REGEX(?variable, "value"))
-    }
 
 
     """
@@ -238,11 +243,11 @@ def Call_LLM_via_API(question):
       "value": "John Doe"
     }
     Example 3:
-    Question: 'tell me when the book Web Engineering was published'
+    Question: 'tell me when the book Adaptives Prothesensystem was published'
     Output:
     {
       "variable": "title",
-      "value": "Web Engineering"
+      "value": "Adaptives Prothesensystem"
     }
     Example 4:
     Question: 'List all the names of all authors who contributed to the book written by James Wang'
@@ -252,11 +257,11 @@ def Call_LLM_via_API(question):
       "value": "James Wang"
     }
     Example 5:
-    Question: 'what the main focus of 'Evolution of Web Science' '
+    Question: 'Please provide a list of publications related to Web Composition. '
     Output:
     {
-      "variable": "creator",
-      "value": "James Wang"
+      "variable": "subject",
+      "value": "Web Composition"
     }
 
     """
@@ -335,16 +340,102 @@ def Call_LLM_via_API(question):
         "required": ["variable", "value"]
     }
 
-
-
-    #call api
+    # call api
 
     api_key = "LL-4nklQdzbKARmXLBB8sQg5RM8jtw3lfms7sSe7OnwOHztA2FmtBwwgE0Q274FzeGy"
     llama = LlamaAPI(api_key)
     model = ChatLlamaAPI(client=llama)
 
     chain = create_tagging_chain(generate_schema, model)
-    response=chain.run(prompt_For_Query)
+    response = chain.run(prompt_For_Query)
     return response
+
+from langchain.output_parsers import ResponseSchema, StructuredOutputParser
+from langchain.prompts import PromptTemplate
+from langchain_openai import ChatOpenAI
+
+def LLM_via_API(question):
+    api_key = "LL-4nklQdzbKARmXLBB8sQg5RM8jtw3lfms7sSe7OnwOHztA2FmtBwwgE0Q274FzeGy"
+    client = openai(
+        api_key=api_key,
+        base_url="https://api.llama-api.com"
+    )
+
+    input = question
+
+    # The system message (instruction) sets the behavior of the assistant.
+    instruction = """Perform entity extraction based on a given property list,
+     extracting values corresponding to specific entity types "
+
+    Property list: [
+                        "publication",
+                        "title",
+                        "available",
+                        "abstract",
+                        "bibliographicCitation",
+                        "issn",
+                        "issued",
+                        "type",
+                        "publisher",
+                        "creator",
+                        "subject",
+                        "description",
+                        "language",
+
+                    ]
+
+    Output JSON in format: {"variable": "entity type","value": "entity"}
+    Use provided examples to understand the logic:
+    Example 1: Question: Tell me who is a publisher of the publication with the abstract 'This is about nature'
+                    Output:{
+          "variable": "abstract",
+          "value": "This is about nature"
+        }
+
+          Example 2:
+        Question: 'Please provide a list of publications related to Web Composition. '
+        Output:
+        {
+          "variable": "subject",
+          "value": "Web Composition"
+        }
+        Example 3:
+        Question: 'tell me the title of the most recent publication, created by John Doe'
+        Output:
+        {
+          "variable": "creator",
+          "value": "John Doe"
+        }
+        Example 4:
+        Question: 'tell me when the book 'Supporting the Evolution' was published'
+        Output:
+        {
+          "variable": "title",
+          "value": "Supporting the Evolution"
+        }
+        Example 5:
+        Question: 'List all the names of all authors who contributed to the book written by John Smith'
+        Output:
+        {
+          "variable": "creator",
+          "value": "John Smith"
+        }
+
+    """
+
+    completion = client.chat.completions.create(
+        model="mistral-7b-instruct-v0.2",
+        response_format={"type": "json_object"},
+        seed=12345,
+        max_tokens=50,
+        messages=[
+            {"role": "system", "content": instruction},
+            {"role": "user", "content": input}
+        ]
+
+    )
+
+    return completion.choices[0].message.content
+
 
 

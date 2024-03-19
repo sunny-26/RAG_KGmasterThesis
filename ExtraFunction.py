@@ -6,7 +6,7 @@ from keybert import KeyBERT
 import spacy
 from sklearn.metrics.pairwise import cosine_similarity
 from langchain_core.messages import HumanMessage, SystemMessage
-
+import json
 
 #Set LLM
 def setup_llama_model(model_repo, model_file, callback_handler=None):
@@ -116,14 +116,42 @@ def construct_system_prompt_for_rag(rag_context):
 
 #rag request
 
-
-def RAG_query(context, question,model):
+async def RAG_query(context, question,model):
 
     response = await model.invoke([
          SystemMessage(
             context
         ),
          HumanMessage(question),
-    ]);
+    ])
 
 
+def extract_json_form_LLM_api(text):
+    json_objects = []
+    start_idx = 0
+
+    while True:
+        start_idx = text.find('{', start_idx)
+        if start_idx == -1:
+            break
+
+        # end index of the json object
+        end_idx = text.find('}', start_idx)
+        if end_idx == -1:
+            break
+
+
+        json_str = text[start_idx:end_idx + 1]
+
+        try:
+            # Try to parse the extracted string as JSON
+            json_obj = json.loads(json_str)
+            json_objects.append(json_obj)
+        except json.JSONDecodeError:
+            # If parsing fails, continue searching for next JSON object
+            pass
+
+        # Move the start index to the end of the current JSON object
+        start_idx = end_idx + 1
+
+    return json_objects
