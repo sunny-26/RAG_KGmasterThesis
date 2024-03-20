@@ -328,6 +328,7 @@ def RAG_Pipeline(question):
     )
 
     final_response=execute_rag(model_path,question,prompt_for_rag)
+    print("User:"+question)
     print(final_response)
 
 
