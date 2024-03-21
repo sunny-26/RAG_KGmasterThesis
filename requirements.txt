@@ -1,4 +1,8 @@
-llama-index==0.9.46
 llama-cpp-python==0.2.38
-llamaindex-py-client==0.1.13
-langchain-core==0.1.18
+langchain==0.1.12
+langchain-core==0.1.31
+langchain-community==0.0.28
+langchain-experimental==0.0.54
+openai==1.13.3
+huggingface-hub==0.21.3
+urllib3==2.2.1
